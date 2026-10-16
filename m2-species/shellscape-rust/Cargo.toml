@@ -1,0 +1,17 @@
+[package]
+name = "shellscape"
+version = "0.1.0"
+edition = "2021"
+description = "借殼地貌：Rust 3D 模型觀察器"
+license = "MIT"
+
+[dependencies]
+three-d = { version = "=0.18.2", features = ["egui-gui"] }
+serde_json = "1.0"
+three-d-asset = { version = "=0.9.2", features = ["gltf", "png"] }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
