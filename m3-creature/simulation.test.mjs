@@ -75,3 +75,30 @@ test('先伸觸手再拉石頭，接觸前石頭留在地面，不會直接跳�
   assert.ok(stone.carrier);
   assert.equal(w.picked, 1);
 });
+
+test('後方觸手逐步放石；落地才計數，收手時石頭留在原地', () => {
+  const w = createWorld();
+  Object.assign(w.agent, { x: 0, z: 0, angle: 0 });
+  Object.assign(w.settings, { sensing: false, irregularity: 0 });
+  const stone = { ...w.stones[0], id: 0, drop: null,
+    carrier: { progress: 0.999, side: 0.2, initialWater: 0, taken: 0 } };
+  w.stones = [stone];
+  stepWorld(w, 1 / 60);
+  assert.ok(stone.drop && stone.carrier);
+  assert.equal(w.released, 0);
+  const start = stonePosition(w, stone);
+  for (let i = 0; i < 30; i++) stepWorld(w, 1 / 60);
+  const middle = stonePosition(w, stone);
+  assert.ok(middle.x < start.x);
+  assert.ok(stone.carrier);
+  assert.equal(w.released, 0);
+  for (let i = 0; i < 40; i++) stepWorld(w, 1 / 60);
+  assert.equal(stone.carrier, null);
+  assert.ok(stone.drop);
+  assert.equal(w.released, 1);
+  const landed = stonePosition(w, stone);
+  for (let i = 0; i < 45; i++) stepWorld(w, 1 / 60);
+  assert.equal(stone.drop, null);
+  assert.deepEqual(stonePosition(w, stone), landed);
+  assert.equal(w.released, 1);
+});

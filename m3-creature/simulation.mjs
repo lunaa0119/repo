@@ -18,7 +18,7 @@ export function createWorld(seed = 415) {
     const stone = {
       id: i, x: (random() * 2 - 1) * bounds.x, z: (random() * 2 - 1) * bounds.z,
       size: i < 1480 ? 0.15 + random() * 0.13 : 0.055 + random() * 0.095, rotation: random() * Math.PI * 2,
-      shape: 0.7 + random() * 0.5, shade: random(), carrier: null, grab: null, patch: -1, water: 0,
+      shape: 0.7 + random() * 0.5, shade: random(), carrier: null, grab: null, drop: null, patch: -1, water: 0,
     };
     // 吸水建材集中在兩個較濕區；每塊都有有限儲水，取完後不自動補滿。
     for (let p = 0; p < sources.length; p++) {
@@ -75,6 +75,16 @@ function updateSensors(world) {
 }
 
 export function stonePosition(world, stone) {
+  if (stone.drop) {
+    const p = clamp(stone.drop.age / stone.drop.landTime, 0, 1);
+    const smooth = p * p * (3 - 2 * p);
+    const { from, to } = stone.drop;
+    return {
+      x: from.x + (to.x - from.x) * smooth,
+      z: from.z + (to.z - from.z) * smooth,
+      y: from.y + (0.065 - from.y) * smooth + Math.sin(p * Math.PI) * 0.055,
+    };
+  }
   if (stone.grab) {
     const pull = clamp((stone.grab.age / stone.grab.duration - 0.42) / 0.58, 0, 1);
     const smooth = pull * pull * (3 - 2 * pull);
@@ -103,7 +113,7 @@ export function moveSource(world, index, x, z) {
   const nextX = clamp(x, -bounds.x + 2.2, bounds.x - 2.2);
   const nextZ = clamp(z, -bounds.z + 2.2, bounds.z - 2.2);
   for (const stone of world.stones) {
-    if (stone.patch !== index || stone.carrier || stone.grab) continue;
+    if (stone.patch !== index || stone.carrier || stone.grab || stone.drop) continue;
     stone.x = clamp(stone.x + nextX - source.x, -bounds.x, bounds.x);
     stone.z = clamp(stone.z + nextZ - source.z, -bounds.z, bounds.z);
   }
@@ -142,6 +152,16 @@ export function stepWorld(world, dt) {
   let attached = world.stones.reduce((n, s) => n + Boolean(s.carrier), 0);
   let reaching = world.stones.reduce((n, s) => n + Boolean(s.grab), 0);
   for (const stone of world.stones) {
+    if (stone.drop) {
+      stone.drop.age += dt;
+      if (stone.drop.age >= stone.drop.landTime && stone.carrier) {
+        stone.x = stone.drop.to.x; stone.z = stone.drop.to.z;
+        stone.carrier = null; world.released++; attached--;
+        world.event = '後方觸手放好碎石，鬆開並收回';
+      }
+      if (stone.drop.age >= stone.drop.duration) stone.drop = null;
+      continue;
+    }
     if (!stone.carrier) {
       if (stone.grab) {
         stone.grab.age += dt;
@@ -169,9 +189,15 @@ export function stepWorld(world, dt) {
     stone.water -= amount; carrier.taken += amount; world.absorbed += amount;
     if (carrier.progress >= 1) {
       const pos = stonePosition(world, stone);
-      stone.x = pos.x; stone.z = pos.z;
-      if (carrier.initialWater > 0) world.event = '建材的水已吸完，從後緣放回';
-      stone.carrier = null; world.released++; attached--;
+      const side = carrier.side;
+      stone.drop = {
+        age: 0, landTime: 1.15, duration: 1.85, side, from: pos,
+        to: {
+          x: a.x - forward.x * 1.48 - forward.z * side,
+          z: a.z - forward.z * 1.48 + forward.x * side,
+        },
+      };
+      world.event = '後方觸手托住碎石，慢慢放回地面';
     }
   }
   updateSourceStrength(world);

@@ -71,26 +71,31 @@ body.scale.set(0.74, 0.018, 0.38); scene.add(body);
 // 觸手沿彎曲路徑伸向同一顆地面石頭，接觸後跟著石頭拉回身前。
 const tentacleSegments = 14;
 const tentacleMaterial = new T.MeshStandardMaterial({ color: '#70bfa5', roughness: 0.32, emissive: '#183a32', emissiveIntensity: 0.35 });
-const tentacles = new T.InstancedMesh(new T.CylinderGeometry(1, 1, 1, 7), tentacleMaterial, 4 * tentacleSegments);
+const tentacles = new T.InstancedMesh(new T.CylinderGeometry(1, 1, 1, 7), tentacleMaterial, 12 * tentacleSegments);
 tentacles.instanceMatrix.setUsage(T.DynamicDrawUsage); tentacles.frustumCulled = false;
 tentacles.castShadow = true; scene.add(tentacles);
-const tips = new T.InstancedMesh(new T.SphereGeometry(1, 10, 8), tentacleMaterial, 4);
+const tips = new T.InstancedMesh(new T.SphereGeometry(1, 10, 8), tentacleMaterial, 12);
 tips.frustumCulled = false; scene.add(tips);
 const tentacleDummy = new T.Object3D(), up = new T.Vector3(0, 1, 0);
 function syncTentacles() {
   const a = world.agent;
-  const active = world.stones.filter(s => s.grab).slice(0, 4);
+  const active = world.stones.filter(s => s.grab).slice(0, 4).map(stone => ({ stone, rear: false }))
+    .concat(world.stones.filter(s => s.drop).slice(0, 8).map(stone => ({ stone, rear: true })));
   tentacles.count = active.length * tentacleSegments; tips.count = active.length;
-  active.forEach((stone, arm) => {
-    const side = stone.grab.side >= 0 ? 0.34 : -0.34;
-    const start = new T.Vector3(a.x + Math.cos(a.angle) * 0.43 - Math.sin(a.angle) * side, 0.14, a.z + Math.sin(a.angle) * 0.43 + Math.cos(a.angle) * side);
+  active.forEach(({ stone, rear }, arm) => {
+    const state = rear ? stone.drop : stone.grab;
+    const side = state.side >= 0 ? 0.34 : -0.34;
+    const anchor = rear ? -0.46 : 0.43;
+    const start = new T.Vector3(a.x + Math.cos(a.angle) * anchor - Math.sin(a.angle) * side, 0.14, a.z + Math.sin(a.angle) * anchor + Math.cos(a.angle) * side);
     const contact = stonePosition(world, stone);
     const target = new T.Vector3(contact.x, contact.y + 0.065, contact.z);
-    const reach = Math.min(1, stone.grab.age / stone.grab.duration / 0.42);
+    const reach = rear
+      ? 1 - Math.max(0, Math.min(1, (state.age - state.landTime) / (state.duration - state.landTime)))
+      : Math.min(1, state.age / state.duration / 0.42);
     const ease = reach * reach * (3 - 2 * reach);
     const end = start.clone().lerp(target, ease);
     const control = start.clone().lerp(end, 0.5);
-    control.y += 0.32 + Math.sin(world.time * 2 + arm) * 0.025;
+    control.y += (rear ? 0.24 : 0.32) + Math.sin(world.time * 2 + arm) * 0.025;
     const curve = new T.QuadraticBezierCurve3(start, control, end);
     for (let j = 0; j < tentacleSegments; j++) {
       const p = curve.getPoint(j / tentacleSegments), q = curve.getPoint((j + 1) / tentacleSegments);
