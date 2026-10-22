@@ -97,11 +97,11 @@ function syncTentacles() {
       const delta = q.clone().sub(p), length = delta.length();
       tentacleDummy.position.copy(p).add(q).multiplyScalar(0.5);
       tentacleDummy.quaternion.setFromUnitVectors(up, length > 0.00001 ? delta.divideScalar(length) : up);
-      const radius = 0.048 * (1 - j / tentacleSegments * 0.55);
+      const radius = 0.016 * (1 - j / tentacleSegments * 0.55);
       tentacleDummy.scale.set(radius, Math.max(length, 0.0001), radius);
       tentacleDummy.updateMatrix(); tentacles.setMatrixAt(arm * tentacleSegments + j, tentacleDummy.matrix);
     }
-    tentacleDummy.position.copy(end); tentacleDummy.quaternion.identity(); tentacleDummy.scale.set(0.055, 0.035, 0.055);
+    tentacleDummy.position.copy(end); tentacleDummy.quaternion.identity(); tentacleDummy.scale.set(0.055 / 3, 0.035 / 3, 0.055 / 3);
     tentacleDummy.updateMatrix(); tips.setMatrixAt(arm, tentacleDummy.matrix);
   });
   tentacles.instanceMatrix.needsUpdate = true; tips.instanceMatrix.needsUpdate = true;
