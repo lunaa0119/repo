@@ -14,11 +14,11 @@ export function createWorld(seed = 415) {
     settings: { sensing: true, sensitivity: 9, irregularity: 0.11, speed: 0.48 },
     event: '前緣收進碎石，後緣放回地面',
   };
-  for (let i = 0; i < 1480; i++) {
+  for (let i = 0; i < 3900; i++) {
     const stone = {
       id: i, x: (random() * 2 - 1) * bounds.x, z: (random() * 2 - 1) * bounds.z,
-      size: 0.15 + random() * 0.13, rotation: random() * Math.PI * 2,
-      shape: 0.7 + random() * 0.5, shade: random(), carrier: null, patch: -1, water: 0,
+      size: i < 1480 ? 0.15 + random() * 0.13 : 0.055 + random() * 0.095, rotation: random() * Math.PI * 2,
+      shape: 0.7 + random() * 0.5, shade: random(), carrier: null, grab: null, patch: -1, water: 0,
     };
     // 吸水建材集中在兩個較濕區；每塊都有有限儲水，取完後不自動補滿。
     for (let p = 0; p < sources.length; p++) {
@@ -75,6 +75,18 @@ function updateSensors(world) {
 }
 
 export function stonePosition(world, stone) {
+  if (stone.grab) {
+    const pull = clamp((stone.grab.age / stone.grab.duration - 0.42) / 0.58, 0, 1);
+    const smooth = pull * pull * (3 - 2 * pull);
+    const a = world.agent, side = stone.grab.side;
+    const targetX = a.x + Math.cos(a.angle) * 0.89 - Math.sin(a.angle) * side;
+    const targetZ = a.z + Math.sin(a.angle) * 0.89 + Math.cos(a.angle) * side;
+    return {
+      x: stone.x + (targetX - stone.x) * smooth,
+      z: stone.z + (targetZ - stone.z) * smooth,
+      y: 0.065 + 0.055 * smooth + Math.sin(pull * Math.PI) * 0.075,
+    };
+  }
   if (!stone.carrier) return { x: stone.x, y: 0.065, z: stone.z };
   const { agent } = world;
   const front = 0.89 - 1.78 * stone.carrier.progress;
@@ -91,7 +103,7 @@ export function moveSource(world, index, x, z) {
   const nextX = clamp(x, -bounds.x + 2.2, bounds.x - 2.2);
   const nextZ = clamp(z, -bounds.z + 2.2, bounds.z - 2.2);
   for (const stone of world.stones) {
-    if (stone.patch !== index || stone.carrier) continue;
+    if (stone.patch !== index || stone.carrier || stone.grab) continue;
     stone.x = clamp(stone.x + nextX - source.x, -bounds.x, bounds.x);
     stone.z = clamp(stone.z + nextZ - source.z, -bounds.z, bounds.z);
   }
@@ -128,15 +140,25 @@ export function stepWorld(world, dt) {
   a.distance += distance;
   const forward = { x: Math.cos(a.angle), z: Math.sin(a.angle) };
   let attached = world.stones.reduce((n, s) => n + Boolean(s.carrier), 0);
+  let reaching = world.stones.reduce((n, s) => n + Boolean(s.grab), 0);
   for (const stone of world.stones) {
     if (!stone.carrier) {
+      if (stone.grab) {
+        stone.grab.age += dt;
+        if (stone.grab.age >= stone.grab.duration) {
+          stone.carrier = { progress: 0, side: stone.grab.side, initialWater: stone.water, taken: 0 };
+          stone.grab = null; world.picked++; attached++; reaching--;
+          world.event = stone.water > 0 ? '觸手拉回吸水建材，附著期間取水' : '觸手把碎石拉回，覆到身上';
+        }
+        continue;
+      }
       const dx = stone.x - a.x, dz = stone.z - a.z;
       const front = dx * forward.x + dz * forward.z;
       const side = -dx * forward.z + dz * forward.x;
-      if (attached < 20 && front > 0.58 && front < 0.98 && Math.abs(side) < 0.55) {
-        stone.carrier = { progress: 0, side, initialWater: stone.water, taken: 0 };
-        world.picked++; attached++;
-        if (stone.water > 0) world.event = '碰到吸水建材，附著期間取水';
+      if (attached + reaching < 20 && reaching < 4 && front > 0.82 && front < 1.65 && Math.abs(side) < 0.78) {
+        stone.grab = { age: 0, duration: 1.65, side: clamp(side, -0.52, 0.52) };
+        reaching++;
+        world.event = '觸手伸向前方碎石，貼住後慢慢拉回';
       }
       continue;
     }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorld, stepWorld, moveSource, bounds } from './simulation.mjs';
+import { createWorld, stepWorld, moveSource, stonePosition, bounds } from './simulation.mjs';
 
 function controlledSource(z, sensing = true) {
   const w = createWorld();
@@ -56,4 +56,22 @@ test('暫停不改變狀態；移動濕區不補回已取走的水，也不移�
   moveSource(w, 0, -5, 2);
   assert.equal(w.stones.reduce((n, s) => n + s.water, 0), water);
   assert.deepEqual(w.stones.filter(s => s.carrier).map(s => s.id), attached);
+});
+
+test('先伸觸手再拉石頭，接觸前石頭留在地面，不會直接跳到身上', () => {
+  const w = createWorld();
+  Object.assign(w.agent, { x: 0, z: 0, angle: 0 });
+  Object.assign(w.settings, { sensing: false, irregularity: 0 });
+  const stone = { ...w.stones[16], id: 0, x: 1.3, z: 0.2, patch: -1, water: 1, carrier: null, grab: null };
+  w.stones = [stone];
+  stepWorld(w, 1 / 60);
+  assert.ok(stone.grab);
+  assert.equal(w.picked, 0);
+  for (let i = 0; i < 15; i++) stepWorld(w, 1 / 60);
+  assert.deepEqual(stonePosition(w, stone), { x: 1.3, y: 0.065, z: 0.2 });
+  assert.equal(w.absorbed, 0);
+  for (let i = 0; i < 100; i++) stepWorld(w, 1 / 60);
+  assert.equal(stone.grab, null);
+  assert.ok(stone.carrier);
+  assert.equal(w.picked, 1);
 });

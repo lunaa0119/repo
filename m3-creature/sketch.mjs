@@ -4,7 +4,7 @@ import { createWorld, stepWorld, humidityAt, sensorPositions, stonePosition, mov
 
 const $ = id => document.getElementById(id);
 const stage = $('stage');
-let world = createWorld(), paused = false, editing = false, playback = 1, last = performance.now(), accumulator = 0;
+let world = createWorld(), paused = false, editing = false, following = true, playback = 1, last = performance.now(), accumulator = 0;
 const scene = new T.Scene();
 scene.background = new T.Color('#323a32');
 scene.fog = new T.FogExp2('#514952', 0.015);
@@ -29,6 +29,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.minZoom = 0.8; controls.maxZoom = 5;
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.target.set(0, 0, 0);
+camera.zoom = 2.15; camera.updateProjectionMatrix();
 scene.add(new T.HemisphereLight('#c5d1c5', '#3e3329', 2.7));
 const sun = new T.DirectionalLight('#f2e3bf', 3.1);
 sun.position.set(-5, 12, 6); sun.castShadow = true;
@@ -66,6 +67,45 @@ scene.add(stonesMesh);
 const dummy = new T.Object3D(), colour = new T.Color();
 const body = new T.Mesh(new T.SphereGeometry(1, 48, 24), new T.MeshPhysicalMaterial({ color: '#506b60', roughness: 0.4, clearcoat: 0.5 }));
 body.scale.set(0.74, 0.018, 0.38); body.visible = false; scene.add(body);
+
+// 觸手沿彎曲路徑伸向同一顆地面石頭，接觸後跟著石頭拉回身前。
+const tentacleSegments = 14;
+const tentacleMaterial = new T.MeshStandardMaterial({ color: '#70bfa5', roughness: 0.32, emissive: '#183a32', emissiveIntensity: 0.35 });
+const tentacles = new T.InstancedMesh(new T.CylinderGeometry(1, 1, 1, 7), tentacleMaterial, 4 * tentacleSegments);
+tentacles.instanceMatrix.setUsage(T.DynamicDrawUsage); tentacles.frustumCulled = false;
+tentacles.castShadow = true; scene.add(tentacles);
+const tips = new T.InstancedMesh(new T.SphereGeometry(1, 10, 8), tentacleMaterial, 4);
+tips.frustumCulled = false; scene.add(tips);
+const tentacleDummy = new T.Object3D(), up = new T.Vector3(0, 1, 0);
+function syncTentacles() {
+  const a = world.agent;
+  const active = world.stones.filter(s => s.grab).slice(0, 4);
+  tentacles.count = active.length * tentacleSegments; tips.count = active.length;
+  active.forEach((stone, arm) => {
+    const side = stone.grab.side >= 0 ? 0.34 : -0.34;
+    const start = new T.Vector3(a.x + Math.cos(a.angle) * 0.43 - Math.sin(a.angle) * side, 0.14, a.z + Math.sin(a.angle) * 0.43 + Math.cos(a.angle) * side);
+    const contact = stonePosition(world, stone);
+    const target = new T.Vector3(contact.x, contact.y + 0.065, contact.z);
+    const reach = Math.min(1, stone.grab.age / stone.grab.duration / 0.42);
+    const ease = reach * reach * (3 - 2 * reach);
+    const end = start.clone().lerp(target, ease);
+    const control = start.clone().lerp(end, 0.5);
+    control.y += 0.32 + Math.sin(world.time * 2 + arm) * 0.025;
+    const curve = new T.QuadraticBezierCurve3(start, control, end);
+    for (let j = 0; j < tentacleSegments; j++) {
+      const p = curve.getPoint(j / tentacleSegments), q = curve.getPoint((j + 1) / tentacleSegments);
+      const delta = q.clone().sub(p), length = delta.length();
+      tentacleDummy.position.copy(p).add(q).multiplyScalar(0.5);
+      tentacleDummy.quaternion.setFromUnitVectors(up, length > 0.00001 ? delta.divideScalar(length) : up);
+      const radius = 0.048 * (1 - j / tentacleSegments * 0.55);
+      tentacleDummy.scale.set(radius, Math.max(length, 0.0001), radius);
+      tentacleDummy.updateMatrix(); tentacles.setMatrixAt(arm * tentacleSegments + j, tentacleDummy.matrix);
+    }
+    tentacleDummy.position.copy(end); tentacleDummy.quaternion.identity(); tentacleDummy.scale.set(0.055, 0.035, 0.055);
+    tentacleDummy.updateMatrix(); tips.setMatrixAt(arm, tentacleDummy.matrix);
+  });
+  tentacles.instanceMatrix.needsUpdate = true; tips.instanceMatrix.needsUpdate = true;
+}
 
 const fieldCanvas = document.createElement('canvas'); fieldCanvas.width = 160; fieldCanvas.height = 112;
 const fieldCtx = fieldCanvas.getContext('2d');
@@ -106,6 +146,11 @@ let nextTrail = 0, nextField = 0, nextUI = 0;
 function syncScene() {
   const a = world.agent;
   body.position.set(a.x, 0.067, a.z); body.rotation.y = -a.angle;
+  if (following) {
+    camera.position.x += a.x - controls.target.x; camera.position.z += a.z - controls.target.z;
+    controls.target.set(a.x, 0, a.z);
+  }
+  syncTentacles();
   for (const s of world.stones) {
     const position = stonePosition(world, s);
     dummy.position.set(position.x, position.y, position.z);
@@ -155,6 +200,12 @@ function resize() {
 }
 new ResizeObserver(resize).observe(stage);
 $('pause').onclick = () => { paused = !paused; $('pause').textContent = paused ? '繼續' : '暫停'; updateUI(); };
+$('closeup').onclick = () => {
+  following = !following; $('closeup').setAttribute('aria-pressed', following);
+  camera.zoom = following ? 2.15 : 1;
+  if (!following) { controls.target.set(0, 0, 0); camera.position.set(0, 18, 13); }
+  camera.updateProjectionMatrix(); syncScene();
+};
 $('reset').onclick = () => {
   world = createWorld(); paused = false; accumulator = 0; trailPoints.length = 0;
   nextTrail = nextField = nextUI = 0;
