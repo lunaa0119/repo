@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>借殼地貌 · 循濕行為小實驗</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">{"imports":{"three":"../m2-species/vendor/three.module.js"}}</script>
+</head>
+<body>
+  <main class="app">
+    <section class="observation" aria-label="生物觀察區">
+      <div id="stage"></div>
+      <header>
+        <span class="eyebrow">SHELLSCAPE / BEHAVIOR STUDY 01</span>
+        <h1>借殼地貌</h1>
+        <p>碎石之下，沿著濕氣緩慢前進。</p>
+      </header>
+      <div class="scene-tip" id="scene-tip">拖曳旋轉 · 滾輪縮放 · 右鍵平移</div>
+      <div class="legend" id="legend" hidden><span></span> 濕度指標：較低 → 較高</div>
+      <div class="scene-note">森林地表局部示意 · 無實際尺寸比例</div>
+      <div class="readout">
+        <div class="readout-top"><span class="live-dot"></span><span id="state-label">正在觀察</span><span id="time">00:00</span></div>
+        <p id="event">前緣收進碎石，後緣放回地面</p>
+        <div class="cycle"><span>前緣收石</span><i>→</i><span>身上移送／取水</span><i>→</i><span>後緣放石</span></div>
+      </div>
+      <div id="error" role="alert" hidden></div>
+    </section>
+    <aside class="controls">
+      <div class="panel-heading"><span class="eyebrow">觀察設定</span><span class="tag">M3 小實驗</span></div>
+      <h2>牠如何找到方向？</h2>
+      <p class="intro">附近左右的濕度差，讓身體逐漸轉向。濕氣感知與碎石交換一起運作。</p>
+      <div class="buttons"><button id="pause">暫停</button><button id="reset" class="secondary">重新觀察</button></div>
+      <fieldset>
+        <legend>看見環境</legend>
+        <label class="switch"><span>顯示濕度分布</span><input id="moisture" type="checkbox"></label>
+        <label class="switch"><span>顯示感測示意</span><input id="sensors" type="checkbox"></label>
+        <label class="switch"><span>透視外殼</span><input id="reveal" type="checkbox"></label>
+        <label class="switch"><span>顯示移動軌跡</span><input id="trail" type="checkbox" checked></label>
+        <p class="hint">感測點為計算示意，器官外形尚未設定。</p>
+      </fieldset>
+      <fieldset>
+        <legend>比較行為</legend>
+        <label class="switch"><span>循濕反應</span><input id="sensing" type="checkbox" checked></label>
+        <label class="range-label" for="sensitivity">轉向反應 <output id="sensitivity-value">9.0</output></label>
+        <input id="sensitivity" type="range" min="0" max="16" step="0.5" value="9">
+        <label class="range-label" for="irregularity">方向變化 <output id="irregularity-value">0.11</output></label>
+        <input id="irregularity" type="range" min="0" max="0.6" step="0.01" value="0.11">
+        <label class="range-label" for="speed">播放倍率 <output id="speed-value">1×</output></label>
+        <input id="speed" type="range" min="0.5" max="4" step="0.5" value="1">
+        <button id="move-source" class="secondary wide" aria-pressed="false">移動一處較濕區</button>
+        <p class="hint">開啟後點擊地面，移動濕區與其中的建材；這是實驗操作。</p>
+      </fieldset>
+      <div class="metrics">
+        <div><span>左側濕度指標</span><strong id="left-value">—</strong></div>
+        <div><span>右側濕度指標</span><strong id="right-value">—</strong></div>
+        <div><span>收進／放回碎石</span><strong id="stones-value">0 / 0</strong></div>
+        <div><span>取水累計・示意單位</span><strong id="water-value">0.00</strong></div>
+      </div>
+      <p class="boundary">土壤仍濕潤，各處濕度不同。此處展示轉向、石塊交換與取水規則；未模擬真實受力、氣候或生理。</p>
+      <a class="reading" href="https://github.com/Mostly1sAnd0s/vehicles" target="_blank" rel="noreferrer">Braitenberg 參考來源 ↗</a>
+    </aside>
+  </main>
+  <script type="module" src="./sketch.mjs"></script>
+</body>
+</html>
