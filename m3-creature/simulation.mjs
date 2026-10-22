@@ -11,7 +11,7 @@ export function createWorld(seed = 415) {
   const world = {
     sources, stones: [], random, time: 0, picked: 0, released: 0, absorbed: 0,
     agent: { x: -4.4, z: 1.2, angle: 0.3, turn: 0, speed: 0, distance: 0, noise: 0, left: 0, right: 0 },
-    settings: { sensing: true, sensitivity: 9, irregularity: 0.11, speed: 0.48 },
+    settings: { sensing: true, sensitivity: 9, irregularity: 0.11, speed: 0.28 },
     event: '前緣收進碎石，後緣放回地面',
   };
   for (let i = 0; i < 3900; i++) {
