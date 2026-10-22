@@ -2,6 +2,16 @@
 
 > **2026-10-16 現行方向**：目前選定「借殼地貌」，舊圓胖動物僅保留為歷史雛形。可查看 [網頁模型](shellscape/README.md)、[Rust 模型](shellscape-rust/README.md) 與 [最新討論](notes.md)。
 
+### GitHub 程式位置與本機開啟（2026-10-22 核對）
+
+- [M2 程式資料夾](https://github.com/lunaa0119/repo/tree/main/m2-species)；目前的借殼地貌網頁程式在 [shellscape/](shellscape/)，入口為 `shellscape/index.html`。
+- 主程式為 `shellscape/creature.js`，樣式內嵌於入口 HTML；貼圖由程式產生。請保留 `shellscape/vendor/` 與上層共用的 `vendor/`（含授權檔），不要只下載 HTML。
+- 在 repo 根目錄執行 `python3 -m http.server 8765 --bind 127.0.0.1`，再開啟 <http://127.0.0.1:8765/m2-species/shellscape/>。GitHub 檔案頁供檢視原始碼，模型需透過 HTTP 伺服器執行。
+- 本次以 GitHub CLI 核對公開 repo 與 main 分支，程式及依賴先前已上傳，無需重複複製。JavaScript 語法、入口所引用的本機依賴及授權檔檢查通過；本次未重新驗證瀏覽器渲染。
+- 本次只補文件紀錄，不加入影片或簡報，不更動其他站的資料夾；本人反思仍待 Luna 自行完成。
+
+AI 揭露：Codex；2026-10-22；Prompt 摘要：用 gh 檢查登入、同步作品集並確認生物程式上傳至 M2，排除影片與簡報；採用範圍：檔案與依賴核對、執行說明、進度文件及 Git 提交，未代寫反思、創作理由或研究結論。
+
 > 截止：10/15（四）上課前 15:30
 > 這一站在做什麼、怎麼做、卡住看哪裡，都在課程頁：<https://course.interaction.tw/oop/#milestones>
 

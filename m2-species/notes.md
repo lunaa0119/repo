@@ -1,5 +1,15 @@
 # M2 物種討論筆記
 
+## 2026-10-22｜GitHub CLI 同步與程式上傳核對
+
+- 已確認 git 與 gh 已安裝、GitHub 帳號 `lunaa0119` 登入有效，並執行 `gh auth setup-git`。
+- 沿用 `/Users/huangyujia/Documents/GitHub/repo` 的現有 clone，對公開作品集 `lunaa0119/repo` 執行 `git pull --ff-only origin main`，結果已是最新版。
+- 以 gh 查到 main 的既有提交 `94a2bec` 已包含借殼地貌網頁程式、共用 Three.js 依賴、套件授權、預覽及 Rust 程式／必要模型資產。因此無須再複製一次，也沒有以舊生物覆蓋目前程式。
+- 本次 `node --check` 檢查 `shellscape/creature.js` 與 `sketch.js` 通過；入口與程式的本機引用遞迴核對未發現缺檔，所查依賴均已受 Git 追蹤，授權檔存在。
+- 本次僅補 M2 README 的程式位置、執行方式與此進度紀錄；不加入影片、簡報或桌面 App，不更動其他站資料夾，不代寫反思。
+- 未重新啟動瀏覽器或 Rust App，不將本次檔案檢查視為互動、畫面、課堂發表或完整 M2 交付驗證；Luna 仍需親自開啟確認。
+- AI：Codex；2026-10-22；Prompt 摘要：以 GitHub CLI 完成作品集同步、確認生物程式上傳並提供 M2 網址。採用範圍：工具／登入核對、依賴檢查、README 執行說明與提交紀錄；未新增生物功能，未代寫反思或設計理由。
+
 ## 2026-10-16｜本輪討論與程式整理上傳（延續 10/15）
 
 ### 創作方向與參考
