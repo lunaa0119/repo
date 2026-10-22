@@ -66,7 +66,7 @@ stonesMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); stonesMesh.castShadow = 
 scene.add(stonesMesh);
 const dummy = new T.Object3D(), colour = new T.Color();
 const body = new T.Mesh(new T.SphereGeometry(1, 48, 24), new T.MeshPhysicalMaterial({ color: '#506b60', roughness: 0.4, clearcoat: 0.5 }));
-body.scale.set(0.74, 0.018, 0.38); body.visible = false; scene.add(body);
+body.scale.set(0.74, 0.018, 0.38); scene.add(body);
 
 // 觸手沿彎曲路徑伸向同一顆地面石頭，接觸後跟著石頭拉回身前。
 const tentacleSegments = 14;
@@ -220,7 +220,6 @@ $('moisture').onchange = e => {
 };
 $('sensors').onchange = e => { sensorGroup.visible = e.target.checked; };
 $('reveal').onchange = e => {
-  body.visible = e.target.checked;
   stoneMaterial.transparent = e.target.checked; stoneMaterial.opacity = e.target.checked ? 0.25 : 1;
   stoneMaterial.depthWrite = !e.target.checked; stoneMaterial.needsUpdate = true;
 };
