@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>借殼地貌 · 循濕行為小實驗</title>
-  <link rel="stylesheet" href="./style.css">
+  <title>石殻姆 · 水循環觀察室</title>
+  <link rel="stylesheet" href="./habitat.css">
   <script type="importmap">{"imports":{"three":"../m2-species/vendor/three.module.js"}}</script>
 </head>
 <body>
@@ -12,25 +12,41 @@
     <section class="observation" aria-label="生物觀察區">
       <div id="stage"></div>
       <header>
-        <span class="eyebrow">SHELLSCAPE / BEHAVIOR STUDY 01</span>
-        <h1>借殼地貌</h1>
-        <p>碎石之下，沿著濕氣緩慢前進。</p>
+        <span class="eyebrow">FIELD OBSERVATORY / SPECIMEN 01</span>
+        <h1>石殻姆<span>水循環觀察室</span></h1>
+        <p>水在身體與環境之間，暫時停留。</p>
       </header>
+      <div class="weather" id="weather-label">SUN / 日照蒸發</div>
       <div class="scene-tip" id="scene-tip">拖曳旋轉 · 滾輪縮放 · 右鍵平移</div>
       <div class="legend" id="legend" hidden><span></span> 濕度指標：較低 → 較高</div>
-      <div class="scene-note">森林地表局部示意 · 無實際尺寸比例</div>
+      <div class="scene-note">薄膜 / 濃稠液體 / 碎石外殼<br>森林地表局部示意 · 相對體型</div>
       <div class="readout">
         <div class="readout-top"><span class="live-dot"></span><span id="state-label">正在觀察</span><span id="time">00:00</span></div>
         <p id="event">前緣收進碎石，後緣放回地面</p>
-        <div class="cycle"><span>前緣收石</span><i>→</i><span>身上移送／取水</span><i>→</i><span>後緣放石</span></div>
+        <div class="cycle"><span>吸水成長</span><i>·</i><span>薄膜分離</span><i>·</i><span>失水微縮</span><i>·</i><span>雨季恢復</span></div>
       </div>
       <div id="error" role="alert" hidden></div>
     </section>
     <aside class="controls">
-      <div class="panel-heading"><span class="eyebrow">觀察設定</span><span class="tag">M3 小實驗</span></div>
-      <h2>牠如何找到方向？</h2>
-      <p class="intro">附近左右的濕度差，讓身體逐漸轉向。濕氣感知與碎石交換一起運作。</p>
+      <div class="panel-heading"><span class="eyebrow">LIVE SPECIMEN</span><span class="tag">虛構物種</span></div>
+      <div class="focus-row"><label for="focus">觀察個體</label><select id="focus"><option value="0">個體 01</option></select></div>
+      <div class="water-gauge" id="water-gauge"><div><span>體內水量</span><strong id="body-water">170</strong><small>mL</small></div></div>
+      <div class="phase-row"><strong id="phase-value" data-phase="active">活動中</strong><span>展示容量 <b id="capacity-mark">260 mL</b></span></div>
+      <div class="population"><div><strong id="population-value">1</strong><span>總個體</span></div><div><strong id="dormant-value">0</strong><span>休眠中</span></div><div><strong id="births-value">0</strong><span>新生個體</span></div><div><strong id="shade-value">—</strong><span>石殼遮蔽</span></div></div>
       <div class="buttons"><button id="pause">暫停</button><button id="reset" class="secondary">重新觀察</button><button id="closeup" class="secondary" aria-pressed="true">近看取石</button></div>
+      <button id="record-demo" class="secondary wide">錄製無字活動影片</button>
+      <p id="record-status" class="hint" role="status">52 秒 · 僅錄製 3D 畫面 · 無文字與音訊<br>錄製時請保持此分頁可見。</p>
+      <fieldset>
+        <legend>水分如何循環</legend>
+        <label class="range-label" for="sunlight">日照強度 <output id="sunlight-value">35%</output></label>
+        <input id="sunlight" type="range" min="0" max="1" step="0.05" value="0.35">
+        <label class="switch"><span>降雨，讓水氣回到地表</span><input id="rain" type="checkbox"></label>
+        <div class="scenario-buttons"><button id="division-demo" class="secondary">看分裂</button><button id="dry-demo" class="secondary">看休眠</button></div>
+        <p class="hint">載入不同起始情境；打開降雨，可觀察微縮個體補水恢復。</p>
+      </fieldset>
+      <div class="water-ledger"><div><span>地表與建材</span><strong id="ground-water">—</strong></div><div><span>全部個體</span><strong id="body-total">—</strong></div><div><span>環境水氣</span><strong id="vapour-water">—</strong></div><p>觀察區總水量 <b id="total-water">—</b> mL</p></div>
+      <details class="species-notes"><summary>石殻姆的設定</summary><p>一層薄膜包住濃稠液體，全身接觸水分都能吸收，並在攝水時分解水中的微生物取得養分。</p><p>牠沒有眼睛，靠感濕器官找濕處。底部蠕動前進，觸手接觸後取石，身體滑過石頭，再從後方放回。碎石在體外遮蔽日照。</p><p>身體膨大到容量上限、環境仍足夠濕潤時，像細胞分裂般分離新個體。新個體立即活動，自行撿石建立外殼。</p><p>日照使體內水分蒸發回環境。低於約 100 mL 時，牠縮成小石子，保留部分外殼並停止移動；補足水分便恢復。這個創作設定中的牠不會死亡。</p><p class="hint">目前無實際尺寸比例；約滑鼠大小的設定與水量尚待協調。分裂容量、分配比例與速率是可調整的展示參數。</p></details>
+      <details class="observation-tools"><summary>環境與觀察工具</summary>
       <fieldset>
         <legend>看見環境</legend>
         <label class="switch"><span>顯示濕度分布</span><input id="moisture" type="checkbox"></label>
@@ -48,6 +64,9 @@
         <input id="irregularity" type="range" min="0" max="0.6" step="0.01" value="0.11">
         <label class="range-label" for="speed">播放倍率 <output id="speed-value">1×</output></label>
         <input id="speed" type="range" min="0.5" max="4" step="0.5" value="1">
+        <label class="range-label" for="capacity">分裂容量・展示參數 <output id="capacity-value">260 mL</output></label>
+        <input id="capacity" type="range" min="220" max="400" step="10" value="260">
+        <p class="hint">暫以 110 mL 分給新個體，保留兩者的活動水量；此分配仍可討論。</p>
         <button id="move-source" class="secondary wide" aria-pressed="false">移動一處較濕區</button>
         <p class="hint">開啟後點擊地面，移動濕區與其中的建材；這是實驗操作。</p>
       </fieldset>
@@ -55,9 +74,11 @@
         <div><span>左側濕度指標</span><strong id="left-value">—</strong></div>
         <div><span>右側濕度指標</span><strong id="right-value">—</strong></div>
         <div><span>收進／放回碎石</span><strong id="stones-value">0 / 0</strong></div>
-        <div><span>取水累計・示意單位</span><strong id="water-value">0.00</strong></div>
+        <div><span>吸水累計</span><strong id="water-value">0 mL</strong></div>
       </div>
-      <p class="boundary">土壤仍濕潤，各處濕度不同。此處展示轉向、石塊交換與取水規則；未模擬真實受力、氣候或生理。</p>
+      </details>
+      <p class="boundary">透明薄膜、碎石遮光與生命循環的互動示意。光線是觀察照明；材質、吸水和分裂速率仍是展示模型。</p>
+      <p><a class="reading" href="https://github.com/lunaa0119/repo/blob/main/m2-species/stone-mu-setting.md" target="_blank" rel="noreferrer">閱讀石殻姆的完整物種設定</a></p>
       <a class="reading" href="https://github.com/Mostly1sAnd0s/vehicles" target="_blank" rel="noreferrer">Braitenberg 參考來源 ↗</a>
     </aside>
   </main>

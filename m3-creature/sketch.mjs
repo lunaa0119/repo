@@ -1,13 +1,15 @@
 import * as T from 'three';
 import { OrbitControls } from '../m2-species/vendor/OrbitControls.js';
-import { createWorld, stepWorld, humidityAt, sensorPositions, stonePosition, moveSource, bounds } from './simulation.mjs';
+import { createWorld, createScenario, stepWorld, humidityAt, sensorPositions, stonePosition, moveSource, bounds, agentById, shellCoverage, totalWater } from './ecosystem.mjs';
+import { createSpecimenRenderer } from './specimen-visual.mjs';
 
 const $ = id => document.getElementById(id);
+let film = null, filmTimer = null;
 const stage = $('stage');
 let world = createWorld(), paused = false, editing = false, following = true, playback = 1, last = performance.now(), accumulator = 0;
 const scene = new T.Scene();
-scene.background = new T.Color('#323a32');
-scene.fog = new T.FogExp2('#514952', 0.015);
+scene.background = new T.Color('#080d10');
+scene.fog = new T.FogExp2('#080d10', 0.045);
 const camera = new T.OrthographicCamera(-11, 11, 8, -8, 0.1, 100);
 camera.position.set(0, 18, 13); camera.lookAt(0, 0, 0);
 let renderer;
@@ -18,26 +20,29 @@ try {
   $('error').textContent = `無法啟動 3D：${error.message}。請用支援 WebGL 的瀏覽器開啟。`;
   throw error;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
 renderer.outputColorSpace = T.SRGBColorSpace;
 renderer.toneMapping = T.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.15;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = T.PCFSoftShadowMap;
 stage.append(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.minZoom = 0.8; controls.maxZoom = 5;
+controls.enableDamping = true; controls.minZoom = 0.8; controls.maxZoom = 8;
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.target.set(0, 0, 0);
-camera.zoom = 2.15; camera.updateProjectionMatrix();
-scene.add(new T.HemisphereLight('#c5d1c5', '#3e3329', 2.7));
-const sun = new T.DirectionalLight('#f2e3bf', 3.1);
+camera.zoom = 4.2; camera.updateProjectionMatrix();
+scene.add(new T.HemisphereLight('#adc8d3', '#151014', 0.9));
+const sun = new T.DirectionalLight('#f2ece2', 2.6);
 sun.position.set(-5, 12, 6); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.left = -12; sun.shadow.camera.right = 12;
 sun.shadow.camera.top = 10; sun.shadow.camera.bottom = -10;
 sun.shadow.bias = -0.0008;
 scene.add(sun);
+const rim = new T.DirectionalLight('#db8fbd', 2.4); rim.position.set(5, 5, -6); scene.add(rim);
+const fill = new T.DirectionalLight('#8fd4d7', 1.7); fill.position.set(-5, 4, 3); scene.add(fill);
+const specimens = createSpecimenRenderer(scene, renderer);
 
 function soilTexture() {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 512;
@@ -54,38 +59,47 @@ function soilTexture() {
   tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(4, 3);
   return tex;
 }
-const soil = new T.Mesh(new T.BoxGeometry(20.4, 0.28, 14.4), new T.MeshStandardMaterial({ color: '#b1aa8f', map: soilTexture(), roughness: 0.95 }));
+const soil = new T.Mesh(new T.BoxGeometry(20.4, 0.28, 14.4), new T.MeshStandardMaterial({ color: '#313a35', map: soilTexture(), roughness: 0.85 }));
 soil.position.y = -0.16; soil.receiveShadow = true; scene.add(soil);
 const plinth = new T.Mesh(new T.BoxGeometry(20.6, 0.32, 14.6), new T.MeshStandardMaterial({ color: '#303b32', roughness: 0.9 }));
 plinth.position.y = -0.43; scene.add(plinth);
 
 // 所有碎石只有一份狀態。被拾起的就是原來的地面碎石，放回時不另外生成。
-const stoneMaterial = new T.MeshStandardMaterial({ color: '#ffffff', roughness: 0.91 });
-const stonesMesh = new T.InstancedMesh(new T.DodecahedronGeometry(1, 0), stoneMaterial, world.stones.length);
+const stoneMaterial = new T.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.48, clearcoat: 0.35, clearcoatRoughness: 0.4 });
+const stonesMesh = new T.InstancedMesh(new T.DodecahedronGeometry(1, 1), stoneMaterial, world.stones.length);
 stonesMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); stonesMesh.castShadow = true; stonesMesh.receiveShadow = true;
 scene.add(stonesMesh);
 const dummy = new T.Object3D(), colour = new T.Color();
-const body = new T.Mesh(new T.SphereGeometry(1, 48, 24), new T.MeshPhysicalMaterial({ color: '#506b60', roughness: 0.4, clearcoat: 0.5 }));
-body.scale.set(0.74, 0.018, 0.38); scene.add(body);
 
 // 觸手沿彎曲路徑伸向同一顆地面石頭，接觸後跟著石頭拉回身前。
 const tentacleSegments = 14;
-const tentacleMaterial = new T.MeshStandardMaterial({ color: '#70bfa5', roughness: 0.32, emissive: '#183a32', emissiveIntensity: 0.35 });
-const tentacles = new T.InstancedMesh(new T.CylinderGeometry(1, 1, 1, 7), tentacleMaterial, 12 * tentacleSegments);
+const tentacleMaterial = new T.MeshPhysicalMaterial({ color: '#b9a7c8', roughness: 0.2, transmission: 0.25, thickness: 0.04, clearcoat: 1 });
+const armGeometry = new T.CylinderGeometry(1, 1, 1, 7), tipGeometry = new T.SphereGeometry(1, 10, 8);
+let armCapacity = 32;
+let tentacles = new T.InstancedMesh(armGeometry, tentacleMaterial, armCapacity * tentacleSegments);
 tentacles.instanceMatrix.setUsage(T.DynamicDrawUsage); tentacles.frustumCulled = false;
 tentacles.castShadow = true; scene.add(tentacles);
-const tips = new T.InstancedMesh(new T.SphereGeometry(1, 10, 8), tentacleMaterial, 12);
+let tips = new T.InstancedMesh(tipGeometry, tentacleMaterial, armCapacity);
 tips.frustumCulled = false; scene.add(tips);
 const tentacleDummy = new T.Object3D(), up = new T.Vector3(0, 1, 0);
 function syncTentacles() {
-  const a = world.agent;
-  const active = world.stones.filter(s => s.grab).slice(0, 4).map(stone => ({ stone, rear: false }))
-    .concat(world.stones.filter(s => s.drop).slice(0, 8).map(stone => ({ stone, rear: true })));
+  const active = world.stones.filter(s => s.grab).map(stone => ({ stone, rear: false }))
+    .concat(world.stones.filter(s => s.drop).map(stone => ({ stone, rear: true })));
+  if (active.length > armCapacity) {
+    while (armCapacity < active.length) armCapacity *= 2;
+    scene.remove(tentacles, tips); tentacles.dispose(); tips.dispose();
+    tentacles = new T.InstancedMesh(armGeometry, tentacleMaterial, armCapacity * tentacleSegments);
+    tips = new T.InstancedMesh(tipGeometry, tentacleMaterial, armCapacity);
+    tentacles.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    tentacles.castShadow = true; tentacles.frustumCulled = tips.frustumCulled = false;
+    scene.add(tentacles, tips);
+  }
   tentacles.count = active.length * tentacleSegments; tips.count = active.length;
   active.forEach(({ stone, rear }, arm) => {
     const state = rear ? stone.drop : stone.grab;
-    const side = state.side >= 0 ? 0.34 : -0.34;
-    const anchor = rear ? -0.46 : 0.43;
+    const a = agentById(world, state.ownerId);
+    const side = (state.side >= 0 ? 0.34 : -0.34) * a.scale;
+    const anchor = (rear ? -0.46 : 0.43) * a.scale;
     const start = new T.Vector3(a.x + Math.cos(a.angle) * anchor - Math.sin(a.angle) * side, 0.14, a.z + Math.sin(a.angle) * anchor + Math.cos(a.angle) * side);
     const contact = stonePosition(world, stone);
     const target = new T.Vector3(contact.x, contact.y + 0.065, contact.z);
@@ -102,7 +116,7 @@ function syncTentacles() {
       const delta = q.clone().sub(p), length = delta.length();
       tentacleDummy.position.copy(p).add(q).multiplyScalar(0.5);
       tentacleDummy.quaternion.setFromUnitVectors(up, length > 0.00001 ? delta.divideScalar(length) : up);
-      const radius = 0.016 * (1 - j / tentacleSegments * 0.55);
+    const radius = 0.016 * a.scale * (1 - j / tentacleSegments * 0.55);
       tentacleDummy.scale.set(radius, Math.max(length, 0.0001), radius);
       tentacleDummy.updateMatrix(); tentacles.setMatrixAt(arm * tentacleSegments + j, tentacleDummy.matrix);
     }
@@ -147,10 +161,24 @@ trailGeometry.setAttribute('position', new T.BufferAttribute(new Float32Array(14
 trailGeometry.setDrawRange(0, 0);
 const trail = new T.Line(trailGeometry, new T.LineBasicMaterial({ color: '#e1cf94', transparent: true, opacity: 0.8, depthTest: false }));
 trail.renderOrder = 3; scene.add(trail);
+const rainGeometry = new T.BufferGeometry();
+rainGeometry.setAttribute('position', new T.BufferAttribute(new Float32Array(96 * 6), 3));
+const rainLines = new T.LineSegments(rainGeometry, new T.LineBasicMaterial({ color: '#a3d6dc', transparent: true, opacity: 0.32, depthWrite: false }));
+rainLines.frustumCulled = false; scene.add(rainLines);
 let nextTrail = 0, nextField = 0, nextUI = 0;
 function syncScene() {
   const a = world.agent;
-  body.position.set(a.x, 0.067, a.z); body.rotation.y = -a.angle;
+  specimens.sync(world);
+  rainLines.visible = world.settings.rain && world.atmosphere > 0;
+  if (rainLines.visible) {
+    const p = rainGeometry.attributes.position;
+    for (let i = 0; i < 96; i++) {
+      const x = a.x + Math.sin(i * 73.1) * 4, z = a.z + Math.cos(i * 37.7) * 3;
+      const y = 4 - ((world.time * 2 + i * 0.371) % 4);
+      p.setXYZ(i * 2, x, y, z); p.setXYZ(i * 2 + 1, x + 0.025, y + 0.12, z);
+    }
+    p.needsUpdate = true;
+  }
   if (following) {
     camera.position.x += a.x - controls.target.x; camera.position.z += a.z - controls.target.z;
     controls.target.set(a.x, 0, a.z);
@@ -162,8 +190,10 @@ function syncScene() {
     dummy.rotation.set(0.15 * Math.sin(s.id), s.rotation, 0.09 * Math.cos(s.id));
     dummy.scale.set(s.size * 1.2, s.size * 0.36, s.size * s.shape);
     dummy.updateMatrix(); stonesMesh.setMatrixAt(s.id, dummy.matrix);
-    if (s.patch >= 0) colour.setHSL(0.16, 0.12 + s.water * 0.025, 0.40 + s.shade * 0.12, T.SRGBColorSpace);
-    else colour.setHSL(0.11 + s.shade * 0.035, 0.05 + s.shade * 0.05, 0.35 + s.shade * 0.23, T.SRGBColorSpace);
+    if (s.patch >= 0) colour.setHSL(0.2, 0.13 + s.water * 0.003, 0.24 + s.shade * 0.12, T.SRGBColorSpace);
+    else colour.setHSL(0.19 + s.shade * 0.04, 0.05 + s.shade * 0.07, 0.22 + s.shade * 0.2, T.SRGBColorSpace);
+    if (s.carrier || s.grab || s.drop) colour.multiplyScalar(1.12);
+    else colour.multiplyScalar(0.48);
     stonesMesh.setColorAt(s.id, colour);
   }
   stonesMesh.instanceMatrix.needsUpdate = true; stonesMesh.instanceColor.needsUpdate = true;
@@ -193,10 +223,31 @@ function updateUI() {
   const a = world.agent;
   $('left-value').textContent = a.left.toFixed(3); $('right-value').textContent = a.right.toFixed(3);
   $('stones-value').textContent = `${world.picked} / ${world.released}`;
-  $('water-value').textContent = world.absorbed.toFixed(2);
+  $('water-value').textContent = `${world.absorbed.toFixed(1)} mL`;
+  $('body-water').textContent = Math.round(a.water);
+  $('phase-value').textContent = a.phase === 'dormant' ? '微縮休眠' : a.division ? '正在分裂' : '活動中';
+  $('phase-value').dataset.phase = a.phase;
+  $('population-value').textContent = world.agents.length;
+  $('dormant-value').textContent = world.agents.filter(x => x.phase === 'dormant').length;
+  $('births-value').textContent = world.births;
+  $('shade-value').textContent = `${Math.round(shellCoverage(world, a) * 100)}%`;
+  $('ground-water').textContent = Math.round(world.groundWater + world.stones.reduce((n, s) => n + s.water, 0));
+  $('body-total').textContent = Math.round(world.agents.reduce((n, x) => n + x.water, 0));
+  $('vapour-water').textContent = Math.round(world.atmosphere);
+  $('total-water').textContent = totalWater(world).toFixed(1);
+  $('water-gauge').style.setProperty('--water-level', `${Math.min(1, a.water / world.settings.capacity) * 100}%`);
+  $('capacity-mark').textContent = `${world.settings.capacity} mL`;
+  const focus = $('focus');
+  if (focus.options.length !== world.agents.length) {
+    focus.replaceChildren(...world.agents.map(x => new Option(`個體 ${String(x.id + 1).padStart(2, '0')}`, x.id)));
+  }
+  focus.value = a.id;
+  sun.intensity = 1.3 + world.settings.sunlight * 2.5;
+  soil.material.roughness = world.settings.rain ? 0.55 : 0.85;
+  $('weather-label').textContent = world.settings.rain ? 'RAIN / 水回到地表' : 'SUN / 日照蒸發';
   $('event').textContent = world.event;
   $('time').textContent = `${String(Math.floor(world.time / 60)).padStart(2, '0')}:${String(Math.floor(world.time % 60)).padStart(2, '0')}`;
-  $('state-label').textContent = paused ? '觀察已暫停' : world.settings.sensing ? '循濕反應開啟' : '對照：循濕反應關閉';
+  $('state-label').textContent = paused ? '觀察已暫停' : a.phase === 'dormant' ? '等待水分 · 仍然存活' : a.division ? '薄膜正在分離' : '生命循環進行中';
 }
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight, aspect = w / h;
@@ -207,7 +258,7 @@ new ResizeObserver(resize).observe(stage);
 $('pause').onclick = () => { paused = !paused; $('pause').textContent = paused ? '繼續' : '暫停'; updateUI(); };
 $('closeup').onclick = () => {
   following = !following; $('closeup').setAttribute('aria-pressed', following);
-  camera.zoom = following ? 2.15 : 1;
+  camera.zoom = following ? 4.2 : 1;
   if (!following) { controls.target.set(0, 0, 0); camera.position.set(0, 18, 13); }
   camera.updateProjectionMatrix(); syncScene();
 };
@@ -217,7 +268,32 @@ $('reset').onclick = () => {
   world.settings.sensing = $('sensing').checked;
   world.settings.sensitivity = Number($('sensitivity').value);
   world.settings.irregularity = Number($('irregularity').value);
+  world.settings.sunlight = Number($('sunlight').value);
+  world.settings.rain = $('rain').checked;
+  world.settings.capacity = Number($('capacity').value);
   $('pause').textContent = '暫停'; syncScene(); drawField(); updateUI();
+};
+$('focus').onchange = e => {
+  world.agent = agentById(world, Number(e.target.value));
+  trailPoints.length = 0; nextTrail = 0; syncScene(); updateUI();
+};
+for (const scenario of ['division', 'dry']) $(`${scenario}-demo`).onclick = () => {
+  world = createScenario(scenario); paused = false; accumulator = 0;
+  trailPoints.length = 0; nextTrail = nextField = nextUI = 0;
+  for (const name of ['sunlight', 'capacity', 'sensitivity', 'irregularity']) {
+    $(name).value = world.settings[name]; $(name).dispatchEvent(new Event('input'));
+  }
+  $('rain').checked = world.settings.rain; $('sensing').checked = world.settings.sensing;
+  $('pause').textContent = '暫停'; drawField(); syncScene(); updateUI();
+};
+$('rain').onchange = e => { world.settings.rain = e.target.checked; drawField(); updateUI(); };
+$('sunlight').oninput = e => {
+  world.settings.sunlight = Number(e.target.value); $('sunlight-value').textContent = `${Math.round(world.settings.sunlight * 100)}%`;
+  updateUI();
+};
+$('capacity').oninput = e => {
+  world.settings.capacity = Number(e.target.value); $('capacity-value').textContent = `${world.settings.capacity} mL`;
+  updateUI();
 };
 $('moisture').onchange = e => {
   field.visible = e.target.checked; $('legend').hidden = !field.visible;
@@ -253,15 +329,66 @@ renderer.domElement.addEventListener('pointerdown', e => {
 
 addEventListener('error', event => { $('error').hidden = false; $('error').textContent = `執行錯誤：${event.message}`; });
 addEventListener('unhandledrejection', event => { $('error').hidden = false; $('error').textContent = `載入錯誤：${event.reason?.message ?? event.reason}`; });
+async function beginFilm() {
+  if (film || $('record-demo').disabled) return;
+  $('record-demo').disabled = true;
+  const saved = { paused, following, playback, ratio: renderer.getPixelRatio(),
+    position: camera.position.clone(), zoom: camera.zoom, target: controls.target.clone(),
+    trail: trail.visible, field: field.visible, sensors: sensorGroup.visible };
+  try {
+    const { startFilm } = await import('./record-film.mjs');
+    paused = false; following = false; playback = 1;
+    trail.visible = field.visible = sensorGroup.visible = false;
+    if (new URLSearchParams(location.search).has('frames')) {
+      renderer.setAnimationLoop(null);
+      const originalWorld = world;
+      try {
+        const { exportFilmFrames } = await import('./record-frames.mjs');
+        await exportFilmFrames({ renderer, camera, controls, createWorld, createScenario, stepWorld, totalWater, updateUI,
+          getWorld: () => world, setWorld: next => { world = next; trailPoints.length = 0; nextTrail = nextField = 0; },
+          syncScene, renderScene: () => renderer.render(scene, camera) });
+      } finally {
+        world = originalWorld; paused = saved.paused; following = saved.following; playback = saved.playback;
+        renderer.setPixelRatio(saved.ratio); camera.position.copy(saved.position); camera.zoom = saved.zoom;
+        controls.target.copy(saved.target); controls.enabled = true;
+        trail.visible = saved.trail; field.visible = saved.field; sensorGroup.visible = saved.sensors;
+        $('record-demo').disabled = false; resize(); syncScene(); updateUI();
+        renderer.setAnimationLoop(animate);
+      }
+      return;
+    }
+    film = await startFilm({ renderer, camera, controls, createWorld, createScenario, totalWater,
+      getWorld: () => world, setWorld: next => { world = next; trailPoints.length = 0; nextTrail = nextField = 0; accumulator = 0; },
+      syncScene, renderScene: () => renderer.render(scene, camera),
+      restore: () => {
+        clearInterval(filmTimer); filmTimer = null;
+        film = null; paused = saved.paused; following = saved.following; playback = saved.playback;
+        renderer.setPixelRatio(saved.ratio); camera.position.copy(saved.position); camera.zoom = saved.zoom;
+        controls.target.copy(saved.target); controls.enabled = true;
+        trail.visible = saved.trail; field.visible = saved.field; sensorGroup.visible = saved.sensors;
+        $('record-demo').disabled = false; resize(); syncScene(); updateUI();
+        renderer.setAnimationLoop(animate);
+      },
+    });
+    // 畫布錄影由計時器推進，避免被視窗遮擋時 requestAnimationFrame 停止。
+    renderer.setAnimationLoop(null);
+    filmTimer = setInterval(() => animate(performance.now()), 1000 / 30);
+  } catch (error) { $('record-status').textContent = `錄製失敗：${error.message}`; $('record-demo').disabled = false; }
+}
+$('record-demo').onclick = beginFilm;
 resize(); syncScene(); drawField(); updateUI();
-renderer.setAnimationLoop(now => {
-  const dt = Math.min((now - last) / 1000, 0.1); last = now;
+function animate(now) {
+  const dt = Math.min((now - last) / 1000, film ? 0.75 : 0.1); last = now;
+  const filming = film?.frame(now);
   if (!paused) {
     accumulator += dt * playback;
     while (accumulator >= 1 / 60) { stepWorld(world, 1 / 60); accumulator -= 1 / 60; }
     syncScene();
   }
-  controls.update();
+  if (!filming) controls.update();
   if (now >= nextUI) { updateUI(); nextUI = now + 120; }
   renderer.render(scene, camera);
-});
+  if (filming) film?.capture(now);
+}
+renderer.setAnimationLoop(animate);
+if (new URLSearchParams(location.search).has('film')) beginFilm();
