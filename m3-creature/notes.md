@@ -205,5 +205,7 @@ AI：Codex；2026-10-22；採用範圍：課程要求核對、既有程式檢查
 - 已同步 origin/main，13/13 行為測試通過。GitHub 儲存庫為公開，原先尚未啟用 Pages。
 - GitHub 拒絕上傳 Actions 流程，原因為現有 OAuth 授權沒有 workflow 範圍；遠端 main 未被修改。改採獨立 gh-pages 分支與 prepare-pages.py 整理發布包，未要求增加帳號權限。
 - 僅發布互動網頁、字體授權與必要 Three.js 依賴；根網址轉到 m3-creature/。原始碼留在 main，日後更新網頁需另行發布 gh-pages。
-- 預定網址：<https://lunaa0119.github.io/repo/m3-creature/>。此筆記建立時仍待首次遠端部署及瀏覽器驗證，結果另行追加。
+- 公開網址：<https://lunaa0119.github.io/repo/m3-creature/>。GitHub Pages 建置回報 built，錯誤欄位為空；[首次部署](https://github.com/lunaa0119/repo/actions/runs/44486580832) completed/success。
+- 原始碼版本 bf9c4d2；發布分支版本 34ad4d2。公開入口 HTTP 200；15 個 HTML、CSS、模組、字體、依賴與授權檔均 HTTP 200，SHA-256 與發布包一致，.mjs 回應為 JavaScript 類型。
+- 本機 Chrome 已請求 HTML、CSS、模組與字體，伺服器均回應 200；公開網址亦已在 Chrome 開啟。但瀏覽器控制工具錯誤、原生截圖無有效頁面內容，故未確認 3D 視覺與按鈕操作。13/13 行為測試通過不代表完整視覺驗收；待 Luna 親自檢視公開版。
 - AI：Codex；日期：2026-11-19；採用範圍：整理已授權公開的既有版本、發布設定與驗證，未代寫本人反思或設計理由。
